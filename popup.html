@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>AI Code Reviewer</title>
+  <style>
+    body {
+      width: 450px;
+      min-height: 400px;
+      padding: 15px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+    }
+
+    h2 {
+      margin: 0 0 15px 0;
+      font-size: 18px;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-section {
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 5px 0;
+      font-size: 13px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-left: 8px;
+    }
+
+    .status-available {
+      background-color: #4caf50;
+    }
+
+    .status-unavailable {
+      background-color: #f44336;
+    }
+
+    .input-section {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      color: #555;
+      font-size: 13px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 150px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .button-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #reviewBtn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      grid-column: 1 / -1;
+    }
+
+    #reviewBtn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    #docBtn {
+      background: #2196f3;
+      color: white;
+    }
+
+    #docBtn:hover:not(:disabled) {
+      background: #1976d2;
+    }
+
+    #refactorBtn {
+      background: #4caf50;
+      color: white;
+    }
+
+    #refactorBtn:hover:not(:disabled) {
+      background: #388e3c;
+    }
+
+    #clearBtn {
+      background: #f44336;
+      color: white;
+      grid-column: 1 / -1;
+    }
+
+    #clearBtn:hover:not(:disabled) {
+      background: #d32f2f;
+    }
+
+    #result {
+      display: none;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 15px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    #result.error {
+      background-color: #ffebee;
+      color: #c62828;
+      border: 1px solid #ef9a9a;
+    }
+
+    #result.success {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #a5d6a7;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .info-text {
+      font-size: 12px;
+      color: #666;
+      margin-top: 10px;
+      padding: 8px;
+      background: #f9f9f9;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h2>🤖 AI Code Reviewer</h2>
+
+  <!-- API Status Section -->
+  <div class="status-section">
+    <div class="status-row">
+      <span>Prompt API:</span>
+      <span id="promptStatus" class="status-badge status-unavailable"></span>
+    </div>
+    <div class="status-row">
+      <span>Writer API:</span>
+      <span id="writerStatus" class="status-badge status-unavailable"></span>
+    </div>
+    <div class="status-row">
+      <span>Rewriter API:</span>
+      <span id="rewriterStatus" class="status-badge status-unavailable"></span>
+    </div>
+  </div>
+
+  <!-- Code Input Section -->
+  <div class="input-section">
+    <label for="codeInput">Code to Review:</label>
+    <textarea 
+      id="codeInput" 
+      placeholder="Paste your code here or select code on GitHub..."
+    ></textarea>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="button-group">
+    <button id="reviewBtn">🔍 Review Code</button>
+    <button id="docBtn">📝 Generate Docs</button>
+    <button id="refactorBtn">🔧 Refactor Code</button>
+    <button id="clearBtn">🗑️ Clear</button>
+  </div>
+
+  <!-- Info Text -->
+  <div class="info-text">
+    💡 Select code on GitHub to auto-open side panel, or paste code above and click an action button.
+  </div>
+
+  <!-- Result Display -->
+  <div id="result"></div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
