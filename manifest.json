@@ -9,18 +9,18 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Gemini Code Reviewer",
-    "default_popup": "popup.html"
+    "default_title": "Gemini Code Reviewer - Click to open side panel"
   },
   "background": {
     "service_worker": "background.js",
-    "type": "module"
+    "type": "module" 
   },
   "permissions": [
     "storage",
     "scripting",
     "activeTab",
-    "sidePanel"
+    "sidePanel",
+    "ai"
   ],
   "host_permissions": [
     "https://github.com/*",
@@ -46,9 +46,6 @@
     }
   ],
   "side_panel": {
-    "default_path": "sidepanel.html"
-  },
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; worker-src 'self'"
+    "default_path": "sidepanel.html" 
   }
 }

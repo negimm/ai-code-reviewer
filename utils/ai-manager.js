@@ -1,23 +1,17 @@
-// utils/ai-manager.js - Enhanced with all Chrome Built-in AI APIs
+// utils/ai-manager.js - With increased timeouts and simpler prompts
 
 export class AIManager {
   constructor() {
-    this.sessions = {
-      prompt: null,
-      writer: null,
-      rewriter: null,
-      summarizer: null
-    };
-    this.translatorSessions = new Map();
-    this.operationTimeout = 180000; // 3 minutes
-    this.initializationPromises = new Map();
+    this.session = null;
+    this.operationTimeout = 300000; // 5 minutes (increased from 3)
+    this.defaultLanguage = 'en';
   }
 
   async withTimeout(promise, timeoutMs = this.operationTimeout) {
     return Promise.race([
       promise,
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
+        setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs/1000}s`)), timeoutMs)
       )
     ]);
   }
@@ -25,86 +19,39 @@ export class AIManager {
   async checkCapabilities() {
     const capabilities = {
       prompt: false,
-      writer: false,
-      rewriter: false,
-      summarizer: false,
-      translator: false,
+      promptStatus: 'checking',
       apiFound: false
     };
 
     try {
-      // Check LanguageModel (Prompt API)
       if (typeof LanguageModel !== 'undefined') {
         capabilities.apiFound = true;
+        
         try {
-          const availability = await this.withTimeout(
-            LanguageModel.availability(),
-            10000
+          // Quick availability check
+          const testSession = await this.withTimeout(
+            LanguageModel.create({
+              expectedInputs: [{ type: 'text', languages: ['en'] }],
+              expectedOutputs: [{ type: 'text', languages: ['en'] }]
+            }),
+            30000 // 30 second timeout for capability check
           );
-          capabilities.prompt = availability !== 'unavailable';
-          capabilities.promptStatus = availability;
+          
+          capabilities.prompt = true;
+          capabilities.promptStatus = 'readily';
+          console.log('✅ LanguageModel API Status: readily available');
+          
+          testSession.destroy();
+          
         } catch (error) {
-          console.warn('LanguageModel check failed:', error);
+          console.error('LanguageModel check failed:', error);
+          capabilities.promptStatus = 'error';
         }
+      } else {
+        console.error('❌ LanguageModel API not found');
+        capabilities.promptStatus = 'not-found';
       }
 
-      // Check Writer API
-      if (typeof AIWriter !== 'undefined') {
-        try {
-          const availability = await this.withTimeout(
-            AIWriter.availability(),
-            10000
-          );
-          capabilities.writer = availability !== 'unavailable';
-          capabilities.writerStatus = availability;
-        } catch (error) {
-          console.warn('AIWriter check failed:', error);
-        }
-      }
-
-      // Check Rewriter API
-      if (typeof AIRewriter !== 'undefined') {
-        try {
-          const availability = await this.withTimeout(
-            AIRewriter.availability(),
-            10000
-          );
-          capabilities.rewriter = availability !== 'unavailable';
-          capabilities.rewriterStatus = availability;
-        } catch (error) {
-          console.warn('AIRewriter check failed:', error);
-        }
-      }
-
-      // Check Summarizer API
-      if (typeof AISummarizer !== 'undefined') {
-        try {
-          const availability = await this.withTimeout(
-            AISummarizer.availability(),
-            10000
-          );
-          capabilities.summarizer = availability !== 'unavailable';
-          capabilities.summarizerStatus = availability;
-        } catch (error) {
-          console.warn('AISummarizer check failed:', error);
-        }
-      }
-
-      // Check Translator API
-      if (typeof AITranslator !== 'undefined') {
-        try {
-          const availability = await this.withTimeout(
-            AITranslator.availability({ sourceLanguage: 'en', targetLanguage: 'es' }),
-            10000
-          );
-          capabilities.translator = availability !== 'unavailable';
-          capabilities.translatorStatus = availability;
-        } catch (error) {
-          console.warn('AITranslator check failed:', error);
-        }
-      }
-
-      console.log('✅ Capabilities check complete:', capabilities);
       return capabilities;
     } catch (error) {
       console.error('❌ Capability check error:', error);
@@ -112,404 +59,158 @@ export class AIManager {
     }
   }
 
-  // Prompt API - Enhanced with retry logic
-  async initPromptSession(options = {}) {
-    if (this.initializationPromises.has('prompt')) {
-      return this.initializationPromises.get('prompt');
-    }
-
-    if (this.sessions.prompt) return this.sessions.prompt;
-
-    const initPromise = this._createPromptSession(options);
-    this.initializationPromises.set('prompt', initPromise);
-
+  async createSession() {
     try {
-      this.sessions.prompt = await initPromise;
-      return this.sessions.prompt;
-    } finally {
-      this.initializationPromises.delete('prompt');
-    }
-  }
-
-  async _createPromptSession(options) {
-    try {
-      if (typeof LanguageModel === 'undefined') {
-        throw new Error('LanguageModel API not available');
+      if (this.session) {
+        try {
+          this.session.destroy();
+        } catch (e) {}
+        this.session = null;
       }
 
-      const availability = await this.withTimeout(
-        LanguageModel.availability(),
-        10000
-      );
+      console.log('Creating LanguageModel session...');
 
-      if (availability === 'unavailable') {
-        throw new Error('Prompt API unavailable');
-      }
-
-      const session = await this.withTimeout(
+      this.session = await this.withTimeout(
         LanguageModel.create({
-          temperature: options.temperature || 0.7,
-          topK: options.topK || 3,
-          systemPrompt: options.systemPrompt || 'You are an expert code reviewer focused on code quality, security, and best practices.'
+          systemPrompt: 'You are a code reviewer. Provide brief, clear feedback.',
+          temperature: 0.7, // Lower temperature for more focused responses
+          topK: 3,
+          expectedInputs: [{ type: 'text', languages: ['en'] }],
+          expectedOutputs: [{ type: 'text', languages: ['en'] }]
         }),
-        60000
+        60000 // 1 minute for session creation
       );
 
-      console.log('✅ Prompt API session created!');
-      return session;
+      console.log('✅ Session created successfully!');
+      return this.session;
+      
     } catch (error) {
-      throw new Error(`Prompt API initialization failed: ${error.message}`);
+      console.error('❌ Session creation failed:', error);
+      this.session = null;
+      throw new Error(`Failed to create session: ${error.message}`);
     }
   }
 
   async reviewCode(code, options = {}) {
-    const maxRetries = 2;
+    const maxRetries = 1; // Reduce to 1 retry to save time
     let lastError;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        const session = await this.initPromptSession();
+        console.log(`🔍 Review attempt ${attempt + 1}/${maxRetries + 1}`);
         
-        const reviewPrompt = `Review this ${options.language || 'code'} for:
-1. Code quality and best practices
-2. Potential bugs and security issues
-3. Performance improvements
-4. Readability and maintainability
+        if (!this.session) {
+          await this.createSession();
+        }
+        
+        // MUCH SIMPLER PROMPT - less tokens, faster processing
+        const reviewPrompt = `Review this code briefly:
 
-Code:
 \`\`\`
-${code}
+${code.substring(0, 2000)}
 \`\`\`
 
-Provide a structured review with specific recommendations.`;
+List 3 key improvements.`;
 
+        console.log('📤 Sending prompt... (may take 1-3 minutes)');
+        
+        // INCREASED TIMEOUT: 5 minutes
         const result = await this.withTimeout(
-          session.prompt(reviewPrompt),
-          120000
+          this.session.prompt(reviewPrompt),
+          300000 // 5 minutes
         );
 
+        console.log('✅ Review completed!');
+        
         return {
           raw: result,
           timestamp: new Date().toISOString(),
           attempts: attempt + 1
         };
+        
       } catch (error) {
         lastError = error;
-        console.warn(`Review attempt ${attempt + 1} failed:`, error);
+        console.warn(`❌ Attempt ${attempt + 1} failed:`, error.message);
 
-        // Clean up failed session
-        if (this.sessions.prompt) {
+        if (this.session) {
           try {
-            this.sessions.prompt.destroy();
-          } catch (e) {
-            console.warn('Session cleanup error:', e);
-          }
-          this.sessions.prompt = null;
+            this.session.destroy();
+          } catch (e) {}
+          this.session = null;
         }
 
-        if (attempt === maxRetries) break;
-        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        if (attempt < maxRetries) {
+          console.log(`⏳ Retrying in 3 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
       }
     }
 
-    throw new Error(`Review failed after ${maxRetries + 1} attempts: ${lastError.message}`);
-  }
-
-  // Writer API - Enhanced
-  async initWriterSession(options = {}) {
-    if (this.initializationPromises.has('writer')) {
-      return this.initializationPromises.get('writer');
-    }
-
-    if (this.sessions.writer) return this.sessions.writer;
-
-    const initPromise = this._createWriterSession(options);
-    this.initializationPromises.set('writer', initPromise);
-
-    try {
-      this.sessions.writer = await initPromise;
-      return this.sessions.writer;
-    } finally {
-      this.initializationPromises.delete('writer');
-    }
-  }
-
-  async _createWriterSession(options) {
-    try {
-      if (typeof AIWriter === 'undefined') {
-        throw new Error('AIWriter API not available');
-      }
-
-      const availability = await this.withTimeout(
-        AIWriter.availability(),
-        10000
-      );
-
-      if (availability === 'unavailable') {
-        throw new Error('Writer API unavailable');
-      }
-
-      const session = await this.withTimeout(
-        AIWriter.create({
-          tone: options.tone || 'formal',
-          format: options.format || 'markdown',
-          length: options.length || 'medium'
-        }),
-        60000
-      );
-
-      console.log('✅ Writer API session created!');
-      return session;
-    } catch (error) {
-      throw new Error(`Writer API initialization failed: ${error.message}`);
-    }
+    throw new Error(`Review failed: ${lastError.message}. Try with shorter code.`);
   }
 
   async generateDocumentation(code, options = {}) {
     try {
-      const writer = await this.initWriterSession(options);
+      if (!this.session) {
+        await this.createSession();
+      }
       
-      const docPrompt = `Generate comprehensive documentation for this code including:
-- Function/class descriptions
-- Parameters and return values
-- Usage examples
-- Important notes
+      // Simpler doc prompt
+      const docPrompt = `Document this code:
 
-Code:
 \`\`\`
-${code}
-\`\`\``;
+${code.substring(0, 2000)}
+\`\`\`
 
+Include main purpose and key functions.`;
+
+      console.log('📝 Generating documentation...');
       const result = await this.withTimeout(
-        writer.write(docPrompt),
-        120000
+        this.session.prompt(docPrompt),
+        300000
       );
 
       return result;
+      
     } catch (error) {
-      console.error('❌ Documentation generation failed:', error);
+      console.error('❌ Documentation failed:', error);
       throw error;
-    }
-  }
-
-  // Rewriter API - Enhanced
-  async initRewriterSession(options = {}) {
-    if (this.initializationPromises.has('rewriter')) {
-      return this.initializationPromises.get('rewriter');
-    }
-
-    if (this.sessions.rewriter) return this.sessions.rewriter;
-
-    const initPromise = this._createRewriterSession(options);
-    this.initializationPromises.set('rewriter', initPromise);
-
-    try {
-      this.sessions.rewriter = await initPromise;
-      return this.sessions.rewriter;
-    } finally {
-      this.initializationPromises.delete('rewriter');
-    }
-  }
-
-  async _createRewriterSession(options) {
-    try {
-      if (typeof AIRewriter === 'undefined') {
-        throw new Error('AIRewriter API not available');
-      }
-
-      const availability = await this.withTimeout(
-        AIRewriter.availability(),
-        10000
-      );
-
-      if (availability === 'unavailable') {
-        throw new Error('Rewriter API unavailable');
-      }
-
-      const session = await this.withTimeout(
-        AIRewriter.create({
-          tone: options.tone || 'as-is',
-          format: options.format || 'as-is',
-          length: options.length || 'as-is'
-        }),
-        60000
-      );
-
-      console.log('✅ Rewriter API session created!');
-      return session;
-    } catch (error) {
-      throw new Error(`Rewriter API initialization failed: ${error.message}`);
     }
   }
 
   async refactorCode(code, options = {}) {
     try {
-      const rewriter = await this.initRewriterSession(options);
+      if (!this.session) {
+        await this.createSession();
+      }
       
-      const refactorContext = `Refactor this code to improve:
-- Code readability and structure
-- Performance and efficiency
-- Following best practices
-- Removing code smells
+      // Simpler refactor prompt
+      const refactorPrompt = `Suggest 3 improvements for this code:
 
-Original code:
 \`\`\`
-${code}
+${code.substring(0, 2000)}
 \`\`\``;
 
+      console.log('🔧 Refactoring...');
       const result = await this.withTimeout(
-        rewriter.rewrite(refactorContext),
-        120000
+        this.session.prompt(refactorPrompt),
+        300000
       );
 
       return result;
+      
     } catch (error) {
       console.error('❌ Refactoring failed:', error);
       throw error;
     }
   }
 
-  // NEW: Summarizer API
-  async initSummarizerSession() {
-    if (this.initializationPromises.has('summarizer')) {
-      return this.initializationPromises.get('summarizer');
-    }
-
-    if (this.sessions.summarizer) return this.sessions.summarizer;
-
-    const initPromise = this._createSummarizerSession();
-    this.initializationPromises.set('summarizer', initPromise);
-
-    try {
-      this.sessions.summarizer = await initPromise;
-      return this.sessions.summarizer;
-    } finally {
-      this.initializationPromises.delete('summarizer');
-    }
-  }
-
-  async _createSummarizerSession() {
-    try {
-      if (typeof AISummarizer === 'undefined') {
-        throw new Error('Summarizer API not available');
-      }
-
-      const availability = await this.withTimeout(
-        AISummarizer.availability(),
-        10000
-      );
-
-      if (availability === 'unavailable') {
-        throw new Error('Summarizer API unavailable');
-      }
-
-      const session = await this.withTimeout(
-        AISummarizer.create({
-          type: 'tl;dr',
-          format: 'markdown',
-          length: 'medium'
-        }),
-        60000
-      );
-
-      console.log('✅ Summarizer API session created!');
-      return session;
-    } catch (error) {
-      throw new Error(`Summarizer API initialization failed: ${error.message}`);
-    }
-  }
-
-  async summarizePR(prContent, options = {}) {
-    try {
-      const summarizer = await this.initSummarizerSession();
-      const result = await this.withTimeout(
-        summarizer.summarize(prContent),
-        60000
-      );
-      return result;
-    } catch (error) {
-      console.error('❌ Summarization failed:', error);
-      throw error;
-    }
-  }
-
-  // NEW: Translator API
-  async initTranslatorSession(sourceLanguage, targetLanguage) {
-    const key = `${sourceLanguage}-${targetLanguage}`;
-    
-    if (this.translatorSessions.has(key)) {
-      return this.translatorSessions.get(key);
-    }
-
-    try {
-      if (typeof AITranslator === 'undefined') {
-        throw new Error('Translator API not available');
-      }
-
-      const availability = await this.withTimeout(
-        AITranslator.availability({ sourceLanguage, targetLanguage }),
-        10000
-      );
-
-      if (availability === 'unavailable') {
-        throw new Error(`Translation ${sourceLanguage} → ${targetLanguage} unavailable`);
-      }
-
-      const translator = await this.withTimeout(
-        AITranslator.create({ sourceLanguage, targetLanguage }),
-        30000
-      );
-
-      this.translatorSessions.set(key, translator);
-      console.log(`✅ Translator session created: ${sourceLanguage} → ${targetLanguage}`);
-      return translator;
-    } catch (error) {
-      throw new Error(`Translator API initialization failed: ${error.message}`);
-    }
-  }
-
-  async translateComment(text, targetLanguage, sourceLanguage = 'en') {
-    try {
-      const translator = await this.initTranslatorSession(sourceLanguage, targetLanguage);
-      return await this.withTimeout(
-        translator.translate(text),
-        30000
-      );
-    } catch (error) {
-      console.error('❌ Translation failed:', error);
-      throw error;
-    }
-  }
-
-  // Cleanup method
   cleanup() {
-    console.log('🧹 Cleaning up AI sessions...');
-    
-    if (this.sessions.prompt) {
-      try { this.sessions.prompt.destroy(); } catch (e) {}
-      this.sessions.prompt = null;
+    if (this.session) {
+      try {
+        this.session.destroy();
+      } catch (e) {}
+      this.session = null;
     }
-    
-    if (this.sessions.writer) {
-      try { this.sessions.writer.destroy(); } catch (e) {}
-      this.sessions.writer = null;
-    }
-    
-    if (this.sessions.rewriter) {
-      try { this.sessions.rewriter.destroy(); } catch (e) {}
-      this.sessions.rewriter = null;
-    }
-    
-    if (this.sessions.summarizer) {
-      try { this.sessions.summarizer.destroy(); } catch (e) {}
-      this.sessions.summarizer = null;
-    }
-
-    this.translatorSessions.forEach(translator => {
-      try { translator.destroy(); } catch (e) {}
-    });
-    this.translatorSessions.clear();
-    
-    this.initializationPromises.clear();
   }
 }

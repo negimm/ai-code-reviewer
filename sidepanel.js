@@ -1,24 +1,27 @@
-// sidepanel.js - With code loading and action buttons
+// sidepanel.js - Process AI DIRECTLY in sidepanel (not via service worker)
 
 import { checkCapabilities, updateStatusDot } from './ui-utils.js';
+import { AIManager } from './utils/ai-manager.js';
 
 console.log('=== SIDEPANEL SCRIPT LOADED ===');
+
+// Create AIManager DIRECTLY in sidepanel context (has access to LanguageModel)
+const aiManager = new AIManager();
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Sidepanel DOM loaded');
   
-  // Check API capabilities
-  const caps = await checkCapabilities();
+  // Check AI capabilities DIRECTLY in sidepanel
+  const caps = await aiManager.checkCapabilities();
   if (caps) {
     updateStatusDot('promptStatus', caps.prompt);
-    updateStatusDot('writerStatus', caps.writer);
-    updateStatusDot('rewriterStatus', caps.rewriter);
+    console.log('AI Capabilities:', caps);
   }
 
-  // Load selected code if available
+  // Load selected code
   await loadSelectedCode();
   
-  // Load any stored results
+  // Load stored results
   await loadStoredResults();
   
   // Setup event listeners
@@ -28,7 +31,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateCharCount();
 });
 
-// Load selected code from storage
 async function loadSelectedCode() {
   const { selectedCode, codeSource } = await chrome.storage.local.get(['selectedCode', 'codeSource']);
   
@@ -36,14 +38,12 @@ async function loadSelectedCode() {
   if (codeInput && selectedCode) {
     codeInput.value = selectedCode;
     updateCharCount();
-    console.log(`Loaded ${selectedCode.length} chars from ${codeSource}`);
-    
-    // Clear selected code from storage
+    console.log(`✅ Loaded ${selectedCode.length} chars from ${codeSource}`);
+    showNotification(`✅ Code loaded (${selectedCode.length} chars)`);
     await chrome.storage.local.remove(['selectedCode', 'codeSource']);
   }
 }
 
-// Update character count
 function updateCharCount() {
   const codeInput = document.getElementById('codeInput');
   const charCount = document.getElementById('charCount');
@@ -52,7 +52,6 @@ function updateCharCount() {
   }
 }
 
-// Load stored results
 async function loadStoredResults() {
   const { lastReview, lastDocumentation, lastRefactor } = 
     await chrome.storage.local.get(['lastReview', 'lastDocumentation', 'lastRefactor']);
@@ -77,10 +76,8 @@ async function loadStoredResults() {
   }
 }
 
-// Format content with markdown
 function formatContent(content) {
   if (!content) return '';
-
   return content
     .replace(/\n/g, '<br>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -88,65 +85,53 @@ function formatContent(content) {
     .replace(/\*([^*]+)\*/g, '<em>$1</em>');
 }
 
-// Setup all event listeners
 function setupEventListeners() {
-  // Character count on input
   const codeInput = document.getElementById('codeInput');
   if (codeInput) {
     codeInput.addEventListener('input', updateCharCount);
   }
 
-  // Tab switching
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       switchTab(btn.getAttribute('data-tab'));
     });
   });
 
-  // Action buttons
   document.getElementById('reviewBtn')?.addEventListener('click', reviewCode);
   document.getElementById('docBtn')?.addEventListener('click', generateDocs);
   document.getElementById('refactorBtn')?.addEventListener('click', refactorCode);
 
-  // Copy buttons
-  document.getElementById('copyReviewBtn')?.addEventListener('click', () => {
-    copyToClipboard('reviewContent');
-  });
-  document.getElementById('copyDocsBtn')?.addEventListener('click', () => {
-    copyToClipboard('docsContent');
-  });
-  document.getElementById('copyRefactorBtn')?.addEventListener('click', () => {
-    copyToClipboard('refactorContent');
-  });
+  document.getElementById('copyReviewBtn')?.addEventListener('click', () => copyToClipboard('reviewContent'));
+  document.getElementById('copyDocsBtn')?.addEventListener('click', () => copyToClipboard('docsContent'));
+  document.getElementById('copyRefactorBtn')?.addEventListener('click', () => copyToClipboard('refactorContent'));
 }
 
-// Action functions
+// CRITICAL: Process AI DIRECTLY in sidepanel (NO service worker communication)
 async function reviewCode() {
   const code = document.getElementById('codeInput')?.value?.trim();
   if (!code || code.length < 10) {
-    alert('Please enter at least 10 characters of code');
+    showNotification('⚠️ Please enter at least 10 characters of code', 'warning');
     return;
   }
 
-  showLoading('Reviewing code...');
+  showLoading('🔍 Reviewing code... This may take 1-2 minutes on first run.');
   disableButtons();
 
   try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'reviewCode',
-      code: code,
-      options: {}
-    });
+    console.log('Processing review DIRECTLY in sidepanel...');
+    
+    // Call AIManager DIRECTLY (not through service worker)
+    const reviewResult = await aiManager.reviewCode(code, {});
 
-    if (response.success) {
-      document.getElementById('reviewContent').innerHTML = formatContent(response.review);
-      switchTab('review');
-      showResults();
-    } else {
-      alert(`Review failed: ${response.error}`);
-    }
+    console.log('✅ Review completed');
+    document.getElementById('reviewContent').innerHTML = formatContent(reviewResult.raw);
+    switchTab('review');
+    showResults();
+    showNotification('✅ Review complete!');
+    
   } catch (error) {
-    alert(`Error: ${error.message}`);
+    console.error('Review error:', error);
+    showNotification(`❌ Review failed: ${error.message}`, 'error');
   } finally {
     hideLoading();
     enableButtons();
@@ -156,29 +141,24 @@ async function reviewCode() {
 async function generateDocs() {
   const code = document.getElementById('codeInput')?.value?.trim();
   if (!code || code.length < 10) {
-    alert('Please enter at least 10 characters of code');
+    showNotification('⚠️ Please enter at least 10 characters of code', 'warning');
     return;
   }
 
-  showLoading('Generating documentation...');
+  showLoading('📝 Generating documentation...');
   disableButtons();
 
   try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'generateDocs',
-      code: code,
-      options: {}
-    });
+    console.log('Generating documentation...');
+    const docsResult = await aiManager.generateDocumentation(code, {});
 
-    if (response.success) {
-      document.getElementById('docsContent').innerHTML = formatContent(response.documentation);
-      switchTab('docs');
-      showResults();
-    } else {
-      alert(`Documentation failed: ${response.error}`);
-    }
+    document.getElementById('docsContent').innerHTML = formatContent(docsResult);
+    switchTab('docs');
+    showResults();
+    showNotification('✅ Documentation complete!');
   } catch (error) {
-    alert(`Error: ${error.message}`);
+    console.error('Documentation error:', error);
+    showNotification(`❌ Documentation failed: ${error.message}`, 'error');
   } finally {
     hideLoading();
     enableButtons();
@@ -188,36 +168,31 @@ async function generateDocs() {
 async function refactorCode() {
   const code = document.getElementById('codeInput')?.value?.trim();
   if (!code || code.length < 10) {
-    alert('Please enter at least 10 characters of code');
+    showNotification('⚠️ Please enter at least 10 characters of code', 'warning');
     return;
   }
 
-  showLoading('Refactoring code...');
+  showLoading('🔧 Refactoring code...');
   disableButtons();
 
   try {
-    const response = await chrome.runtime.sendMessage({
-      action: 'refactorCode',
-      code: code,
-      options: {}
-    });
+    console.log('Refactoring code...');
+    const refactorResult = await aiManager.refactorCode(code, {});
 
-    if (response.success) {
-      document.getElementById('refactorContent').innerHTML = formatContent(response.refactored);
-      switchTab('refactor');
-      showResults();
-    } else {
-      alert(`Refactoring failed: ${response.error}`);
-    }
+    document.getElementById('refactorContent').innerHTML = formatContent(refactorResult);
+    switchTab('refactor');
+    showResults();
+    showNotification('✅ Refactoring complete!');
   } catch (error) {
-    alert(`Error: ${error.message}`);
+    console.error('Refactor error:', error);
+    showNotification(`❌ Refactoring failed: ${error.message}`, 'error');
   } finally {
     hideLoading();
     enableButtons();
   }
 }
 
-// UI Helper functions
+// UI Helper Functions
 function switchTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.remove('active');
@@ -274,27 +249,32 @@ function copyToClipboard(elementId) {
     showNotification('✅ Copied to clipboard!');
   }).catch(err => {
     console.error('Copy failed:', err);
-    showNotification('❌ Copy failed');
+    showNotification('❌ Copy failed', 'error');
   });
 }
 
-function showNotification(message) {
+function showNotification(message, type = 'success') {
+  document.querySelectorAll('.notification').forEach(n => n.remove());
+  
   const notification = document.createElement('div');
+  notification.className = 'notification';
   notification.textContent = message;
+  
+  const colors = {
+    success: '#4CAF50',
+    error: '#f44336',
+    warning: '#ff9800'
+  };
+  
   notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 12px 20px;
-    background: #4CAF50;
-    color: white;
-    border-radius: 6px;
-    z-index: 10000;
+    position: fixed; top: 20px; right: 20px; padding: 12px 20px;
+    background: ${colors[type] || colors.success}; color: white;
+    border-radius: 6px; z-index: 10000;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   `;
-
+  
   document.body.appendChild(notification);
   setTimeout(() => notification.remove(), 3000);
 }
 
-console.log('✅ Sidepanel initialized');
+console.log('✅ Sidepanel initialized with DIRECT AI processing');

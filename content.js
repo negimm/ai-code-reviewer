@@ -1,4 +1,4 @@
-// content.js - Enhanced with auto sidepanel opening on selection
+// content.js - Auto-open sidepanel on text selection (no popup button)
 
 console.log('🔍 AI Code Reviewer content script loaded');
 
@@ -117,73 +117,37 @@ function injectReviewButtons(container) {
 }
 
 /**
- * Detect programming language from code block
- */
-function detectLanguage(codeBlock) {
-  const classList = Array.from(codeBlock.classList);
-  for (const cls of classList) {
-    if (cls.startsWith('language-')) {
-      return cls.replace('language-', '');
-    }
-  }
-  
-  const fileInfo = codeBlock.closest('[data-file-type]');
-  if (fileInfo) {
-    return fileInfo.getAttribute('data-file-type');
-  }
-  
-  return 'unknown';
-}
-
-/**
- * Handle text selection and auto-open sidepanel
+ * Handle text selection and AUTO-OPEN sidepanel (no popup button)
  */
 let selectionTimeout;
+let lastSelectionLength = 0;
+
 function handleTextSelection() {
-  // Clear existing timeout
   clearTimeout(selectionTimeout);
-  
-  // Remove existing indicator
-  const existingIndicator = document.getElementById('ai-reviewer-indicator');
-  if (existingIndicator) {
-    existingIndicator.remove();
-  }
 
   const selection = window.getSelection();
   const selectedText = selection.toString().trim();
 
+  // Minimum 20 characters to avoid accidental selections
   if (selectedText.length < 20) {
+    lastSelectionLength = 0;
     return;
   }
 
-  // Create floating indicator
-  const indicator = document.createElement('div');
-  indicator.id = 'ai-reviewer-indicator';
-  indicator.className = 'ai-reviewer-indicator';
-  indicator.innerHTML = `
-    <div class="selection-info">
-      <span class="icon">🤖</span>
-      <span class="text">${selectedText.length} characters selected</span>
-      <button class="review-btn" id="openSidepanelBtn">Open Side Panel</button>
-    </div>
-  `;
+  // Only trigger if selection changed significantly
+  if (Math.abs(selectedText.length - lastSelectionLength) < 10) {
+    return;
+  }
 
-  document.body.appendChild(indicator);
+  lastSelectionLength = selectedText.length;
 
-  // Position near selection
-  const range = selection.getRangeAt(0);
-  const rect = range.getBoundingClientRect();
-  indicator.style.position = 'fixed';
-  indicator.style.top = `${Math.min(rect.bottom + 10, window.innerHeight - 100)}px`;
-  indicator.style.left = `${Math.min(rect.left, window.innerWidth - 400)}px`;
-  indicator.style.zIndex = '10000';
+  // Show a brief toast notification instead of popup
+  showToast(`✅ Selected ${selectedText.length} characters - Opening side panel...`);
 
-  // Add click handler to open sidepanel
-  document.getElementById('openSidepanelBtn').addEventListener('click', async () => {
+  // Auto-open sidepanel after brief delay
+  selectionTimeout = setTimeout(async () => {
     try {
       const sanitizedCode = sanitizeCode(selectedText);
-      
-      indicator.querySelector('.review-btn').textContent = 'Opening...';
       
       // Store selected code
       await chrome.storage.local.set({ 
@@ -192,35 +156,92 @@ function handleTextSelection() {
         selectionTimestamp: Date.now()
       });
       
-      // Open sidepanel
+      // Open sidepanel automatically
       await chrome.runtime.sendMessage({ action: 'openSidePanel' });
       
-      indicator.remove();
+      console.log('✅ Sidepanel opened with selected code');
+      
     } catch (error) {
       console.error('Selection error:', error);
-      alert(`Failed: ${error.message}`);
+      showToast(`❌ Failed: ${error.message}`, 'error');
     }
-  });
-
-  // Auto-remove after 10 seconds
-  selectionTimeout = setTimeout(() => {
-    if (indicator.parentElement) {
-      indicator.remove();
-    }
-  }, 10000);
+  }, 500); // 500ms delay to ensure selection is complete
 }
 
-// Listen for text selection
-document.addEventListener('mouseup', () => {
-  setTimeout(handleTextSelection, 100);
-});
+/**
+ * Show a brief toast notification (replaces the purple popup)
+ */
+function showToast(message, type = 'success') {
+  // Remove existing toasts
+  document.querySelectorAll('.ai-review-toast').forEach(t => t.remove());
 
-// Clear indicator when user clicks elsewhere
-document.addEventListener('mousedown', (e) => {
-  const indicator = document.getElementById('ai-reviewer-indicator');
-  if (indicator && !indicator.contains(e.target)) {
-    indicator.remove();
+  const toast = document.createElement('div');
+  toast.className = 'ai-review-toast';
+  toast.textContent = message;
+  
+  const colors = {
+    success: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    error: 'linear-gradient(135deg, #f44336 0%, #e91e63 100%)'
+  };
+  
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    padding: 12px 20px;
+    background: ${colors[type] || colors.success};
+    color: white;
+    border-radius: 8px;
+    z-index: 10000;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease-out;
+    pointer-events: none;
+  `;
+
+  document.body.appendChild(toast);
+
+  // Auto-remove after 2 seconds
+  setTimeout(() => {
+    toast.style.animation = 'slideDown 0.3s ease-out';
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
+}
+
+// Add CSS for toast animations
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+  }
+`;
+document.head.appendChild(style);
+
+// Listen for text selection (debounced)
+let mouseUpTimeout;
+document.addEventListener('mouseup', () => {
+  clearTimeout(mouseUpTimeout);
+  mouseUpTimeout = setTimeout(handleTextSelection, 300);
 });
 
 // Initial injection
