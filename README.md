@@ -125,15 +125,15 @@ This tool enables developers in security-conscious organizations to leverage AI 
 
 ```
 ai-code-reviewer/
-├── manifest.json              # Extension configuration
-├── background.js              # Service worker (opens sidepanel)
+├── manifest.json             # Extension configuration
+├── background.js             # Service worker (opens sidepanel)
 ├── sidepanel.html            # Main UI
 ├── sidepanel.js              # Main logic + AI processing
 ├── content.js                # GitHub code selection handler
 ├── content.css               # GitHub UI styling
+├── ui-utils.js               # UI helper functions
 ├── utils/
 │   ├── ai-manager.js         # LanguageModel API wrapper
-│   └── ui-utils.js           # UI helper functions
 └── icons/
     ├── icon16.png
     ├── icon48.png
@@ -146,7 +146,7 @@ ai-code-reviewer/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/ai-code-reviewer.git
+   git clone https://github.com/negimm/ai-code-reviewer.git
    cd ai-code-reviewer
    ```
 
@@ -411,10 +411,10 @@ This extension enables thousands of developers in security-conscious organizatio
 ## 👤 Author
 
 **Technical Architect with 18+ years experience**
-- **Role**: Leading code reviews for enterprise development teams
 - **Background**: Java Development, Machine Learning, System Architecture
-- **GitHub**: [@yourusername](https://github.com/yourusername)
-- **LinkedIn**: [Your LinkedIn](https://linkedin.com/in/yourprofile)
+- **GitHub**: [https://github.com/negimm]
+- **LinkedIn**: [https://www.linkedin.com/in/manmohan-negi-189578102/]
+- **Kaggle**: [https://www.kaggle.com/manmohan123]
 
 ## 🙏 Acknowledgments
 
