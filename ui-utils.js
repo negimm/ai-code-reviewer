@@ -1,32 +1,40 @@
-// ui-utils.js
+// ui-utils.js - Fixed status indicator
 
-/**
- * Checks the availability of all AI APIs via the Service Worker.
- * @returns {Promise<Object|null>} An object with capabilities (prompt, writer, rewriter) or null on error.
- */
 export async function checkCapabilities() {
+  const capabilities = {
+    prompt: false,
+    writer: false,
+    rewriter: false,
+    apiFound: false
+  };
+
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'checkAICapabilities' });
-    if (response?.success) {
-      return response.capabilities;
+    if (typeof LanguageModel !== 'undefined') {
+      capabilities.apiFound = true;
+      const availability = await LanguageModel.availability();
+      capabilities.prompt = (availability === 'readily' || availability === 'available');
     }
-    console.error('Failed to get capabilities:', response?.error || 'Unknown error.');
-    return null;
   } catch (error) {
-    console.error('Error checking capabilities:', error);
-    return null;
+    console.error('Capability check failed:', error);
   }
+
+  return capabilities;
 }
 
-/**
- * Updates the visual status dot in the UI.
- * @param {string} elementId - The ID of the status badge element (e.g., 'promptStatus').
- * @param {boolean} isAvailable - Whether the API is available.
- */
 export function updateStatusDot(elementId, isAvailable) {
   const element = document.getElementById(elementId);
-  if (element) {
-    element.className = `status-badge ${isAvailable ? 'status-available' : 'status-unavailable'}`;
-    element.textContent = isAvailable ? 'Available' : 'Unavailable';
+  if (!element) {
+    console.warn(`Element ${elementId} not found`);
+    return;
+  }
+  
+  // Remove both classes first
+  element.classList.remove('status-available', 'status-unavailable');
+  
+  // Add appropriate class
+  if (isAvailable) {
+    element.classList.add('status-available');
+  } else {
+    element.classList.add('status-unavailable');
   }
 }

@@ -5,56 +5,70 @@
   <title>AI Code Review Panel</title>
   <style>
     * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8f9fa;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f8f9fa;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 15px 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
+  .header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+  }
 
-    .header h1 {
-      font-size: 18px;
-      margin-bottom: 10px;
-    }
+  .header h1 {
+    font-size: 18px;
+    margin: 0 0 10px 0;
+    font-weight: 600;
+  }
 
-    .status-section {
-      display: flex;
-      gap: 15px;
-      font-size: 12px;
-    }
+  .status-section {
+    display: flex;
+    gap: 20px;
+    font-size: 12px;
+    align-items: center;
+  }
 
-    .status-item {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
 
-    .status-badge {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-    }
+  .status-badge {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    background-color: #f44336; /* Default: unavailable (red) */
+  }
 
-    .status-available {
-      background-color: #4caf50;
-    }
+  .status-badge.status-available {
+    background-color: #4caf50; /* Green when available */
+  }
 
-    .status-unavailable {
-      background-color: #f44336;
-    }
+  .status-badge.status-unavailable {
+    background-color: #f44336; /* Red when unavailable */
+  }
+
+  .status-text {
+    color: white;
+    opacity: 0.95;
+    font-weight: 500;
+  }
 
     /* Code Input Section */
     .code-input-section {
@@ -260,22 +274,22 @@
 <body>
   <!-- Header -->
   <div class="header">
-    <h1>🤖 AI Code Review Panel</h1>
-    <div class="status-section">
-      <div class="status-item">
-        <span class="status-badge" id="promptStatus"></span>
-        <span>Prompt API</span>
-      </div>
-      <div class="status-item">
-        <span class="status-badge" id="writerStatus"></span>
-        <span>Writer API</span>
-      </div>
-      <div class="status-item">
-        <span class="status-badge" id="rewriterStatus"></span>
-        <span>Rewriter API</span>
-      </div>
+  <h1>🤖 AI Code Review Panel</h1>
+  <div class="status-section">
+    <div class="status-item">
+      <span class="status-badge" id="promptStatus"></span>
+      <span class="status-text">Prompt API</span>
+    </div>
+    <div class="status-item">
+      <span class="status-badge" id="writerStatus"></span>
+      <span class="status-text">Writer API</span>
+    </div>
+    <div class="status-item">
+      <span class="status-badge" id="rewriterStatus"></span>
+      <span class="status-text">Rewriter API</span>
     </div>
   </div>
+</div>
 
   <!-- Code Input Section -->
   <div class="code-input-section">
