@@ -19,8 +19,7 @@
     "storage",
     "scripting",
     "activeTab",
-    "sidePanel",
-    "ai"
+    "sidePanel"
   ],
   "host_permissions": [
     "https://github.com/*",

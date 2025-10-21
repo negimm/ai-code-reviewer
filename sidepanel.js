@@ -1,35 +1,44 @@
-// sidepanel.js - Process AI DIRECTLY in sidepanel (not via service worker)
+// sidepanel.js - Complete with 3 API status support and textarea results
 
-import { checkCapabilities, updateStatusDot } from './ui-utils.js';
 import { AIManager } from './utils/ai-manager.js';
 
 console.log('=== SIDEPANEL SCRIPT LOADED ===');
 
-// Create AIManager DIRECTLY in sidepanel context (has access to LanguageModel)
 const aiManager = new AIManager();
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Sidepanel DOM loaded');
   
-  // Check AI capabilities DIRECTLY in sidepanel
+  // Check AI capabilities for all 3 APIs
   const caps = await aiManager.checkCapabilities();
   if (caps) {
-    updateStatusDot('promptStatus', caps.prompt);
+    updateStatusIndicator('promptStatus', 'promptStatusItem', caps.prompt);
+    updateStatusIndicator('writerStatus', 'writerStatusItem', caps.writer);
+    updateStatusIndicator('rewriterStatus', 'rewriterStatusItem', caps.rewriter);
     console.log('AI Capabilities:', caps);
   }
 
-  // Load selected code
   await loadSelectedCode();
-  
-  // Load stored results
   await loadStoredResults();
-  
-  // Setup event listeners
   setupEventListeners();
-  
-  // Update character count
   updateCharCount();
 });
+
+// Helper function to update status indicators
+function updateStatusIndicator(badgeId, itemId, isAvailable) {
+  const badge = document.getElementById(badgeId);
+  const item = document.getElementById(itemId);
+  
+  if (badge && item) {
+    if (isAvailable) {
+      badge.classList.add('status-available');
+      item.classList.add('active');
+    } else {
+      badge.classList.remove('status-available');
+      item.classList.remove('active');
+    }
+  }
+}
 
 async function loadSelectedCode() {
   const { selectedCode, codeSource } = await chrome.storage.local.get(['selectedCode', 'codeSource']);
@@ -57,32 +66,23 @@ async function loadStoredResults() {
     await chrome.storage.local.get(['lastReview', 'lastDocumentation', 'lastRefactor']);
 
   if (lastReview) {
-    document.getElementById('reviewContent').innerHTML = formatContent(lastReview);
+    document.getElementById('reviewContent').value = lastReview;
     switchTab('review');
     showResults();
     await chrome.storage.local.remove('lastReview');
   } 
   else if (lastDocumentation) {
-    document.getElementById('docsContent').innerHTML = formatContent(lastDocumentation);
+    document.getElementById('docsContent').value = lastDocumentation;
     switchTab('docs');
     showResults();
     await chrome.storage.local.remove('lastDocumentation');
   } 
   else if (lastRefactor) {
-    document.getElementById('refactorContent').innerHTML = formatContent(lastRefactor);
+    document.getElementById('refactorContent').value = lastRefactor;
     switchTab('refactor');
     showResults();
     await chrome.storage.local.remove('lastRefactor');
   }
-}
-
-function formatContent(content) {
-  if (!content) return '';
-  return content
-    .replace(/\n/g, '<br>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
 }
 
 function setupEventListeners() {
@@ -106,7 +106,6 @@ function setupEventListeners() {
   document.getElementById('copyRefactorBtn')?.addEventListener('click', () => copyToClipboard('refactorContent'));
 }
 
-// CRITICAL: Process AI DIRECTLY in sidepanel (NO service worker communication)
 async function reviewCode() {
   const code = document.getElementById('codeInput')?.value?.trim();
   if (!code || code.length < 10) {
@@ -114,17 +113,15 @@ async function reviewCode() {
     return;
   }
 
-  showLoading('🔍 Reviewing code... This may take 1-2 minutes on first run.');
+  showLoading('🔍 Reviewing code...');
   disableButtons();
 
   try {
-    console.log('Processing review DIRECTLY in sidepanel...');
-    
-    // Call AIManager DIRECTLY (not through service worker)
+    console.log('Processing review...');
     const reviewResult = await aiManager.reviewCode(code, {});
 
     console.log('✅ Review completed');
-    document.getElementById('reviewContent').innerHTML = formatContent(reviewResult.raw);
+    document.getElementById('reviewContent').value = reviewResult.raw;
     switchTab('review');
     showResults();
     showNotification('✅ Review complete!');
@@ -152,7 +149,7 @@ async function generateDocs() {
     console.log('Generating documentation...');
     const docsResult = await aiManager.generateDocumentation(code, {});
 
-    document.getElementById('docsContent').innerHTML = formatContent(docsResult);
+    document.getElementById('docsContent').value = docsResult;
     switchTab('docs');
     showResults();
     showNotification('✅ Documentation complete!');
@@ -179,7 +176,7 @@ async function refactorCode() {
     console.log('Refactoring code...');
     const refactorResult = await aiManager.refactorCode(code, {});
 
-    document.getElementById('refactorContent').innerHTML = formatContent(refactorResult);
+    document.getElementById('refactorContent').value = refactorResult;
     switchTab('refactor');
     showResults();
     showNotification('✅ Refactoring complete!');
@@ -192,7 +189,6 @@ async function refactorCode() {
   }
 }
 
-// UI Helper Functions
 function switchTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.remove('active');
@@ -209,20 +205,34 @@ function switchTab(tabName) {
 }
 
 function showResults() {
-  document.getElementById('resultsContainer').style.display = 'block';
-  document.getElementById('placeholder').style.display = 'none';
+  const resultsContainer = document.getElementById('resultsContainer');
+  const placeholder = document.getElementById('placeholder');
+  
+  if (resultsContainer) {
+    resultsContainer.classList.add('show');
+    resultsContainer.style.display = 'block';
+  }
+  if (placeholder) {
+    placeholder.style.display = 'none';
+  }
 }
 
 function showLoading(message) {
   const loading = document.getElementById('loadingIndicator');
   if (loading) {
-    loading.querySelector('div:last-child').textContent = message;
+    const loadingText = loading.querySelector('.loading-text');
+    if (loadingText) {
+      loadingText.textContent = message;
+    }
     loading.style.display = 'block';
   }
 }
 
 function hideLoading() {
-  document.getElementById('loadingIndicator').style.display = 'none';
+  const loading = document.getElementById('loadingIndicator');
+  if (loading) {
+    loading.style.display = 'none';
+  }
 }
 
 function disableButtons() {
@@ -243,7 +253,7 @@ function copyToClipboard(elementId) {
   const element = document.getElementById(elementId);
   if (!element) return;
 
-  const text = element.textContent || element.innerText;
+  const text = element.value || element.textContent || element.innerText;
   
   navigator.clipboard.writeText(text).then(() => {
     showNotification('✅ Copied to clipboard!');
@@ -267,14 +277,18 @@ function showNotification(message, type = 'success') {
   };
   
   notification.style.cssText = `
-    position: fixed; top: 20px; right: 20px; padding: 12px 20px;
+    position: fixed; top: 80px; right: 24px; padding: 14px 20px;
     background: ${colors[type] || colors.success}; color: white;
-    border-radius: 6px; z-index: 10000;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    border-radius: 12px; z-index: 10000; font-size: 14px; font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    animation: slideIn 0.3s ease;
   `;
   
   document.body.appendChild(notification);
-  setTimeout(() => notification.remove(), 3000);
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
 }
 
 console.log('✅ Sidepanel initialized with DIRECT AI processing');

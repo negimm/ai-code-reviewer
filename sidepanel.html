@@ -1,136 +1,282 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>AI Code Review Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Code Reviewer</title>
   <style>
     * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #f8f9fa;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 15px 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    flex-shrink: 0;
-  }
-
-  .header h1 {
-    font-size: 18px;
-    margin: 0 0 10px 0;
-    font-weight: 600;
-  }
-
-  .status-section {
-    display: flex;
-    gap: 20px;
-    font-size: 12px;
-    align-items: center;
-  }
-
-  .status-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-  }
-
-  .status-badge {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    flex-shrink: 0;
-    background-color: #f44336; /* Default: unavailable (red) */
-  }
-
-  .status-badge.status-available {
-    background-color: #4caf50; /* Green when available */
-  }
-
-  .status-badge.status-unavailable {
-    background-color: #f44336; /* Red when unavailable */
-  }
-
-  .status-text {
-    color: white;
-    opacity: 0.95;
-    font-weight: 500;
-  }
-
-    /* Code Input Section */
-    .code-input-section {
-      padding: 15px 20px;
-      background: white;
-      border-bottom: 2px solid #e0e0e0;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
 
-    .code-input-header {
+    :root {
+      /* Google Color Palette */
+      --google-blue: #4285f4;
+      --google-red: #ea4335;
+      --google-yellow: #fbbc04;
+      --google-green: #34a853;
+      --google-blue-hover: #1a73e8;
+      --google-red-hover: #d33b29;
+      --google-yellow-hover: #f9ab00;
+      --google-green-hover: #2d8e4a;
+      
+      /* Neutral Colors */
+      --gray-50: #fafafa;
+      --gray-100: #f5f5f7;
+      --gray-200: #e8eaed;
+      --gray-300: #dadce0;
+      --gray-400: #9aa0a6;
+      --gray-500: #5f6368;
+      --gray-900: #202124;
+      
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(60,64,67,0.1);
+      --shadow-md: 0 1px 4px rgba(60,64,67,0.15);
+      --shadow-lg: 0 2px 8px rgba(60,64,67,0.2);
+      
+      /* Border Radius */
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Google Sans', 'Roboto', 'Segoe UI', sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-900);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Header with Google Colors */
+    .header {
+      background: white;
+      border-bottom: 1px solid var(--gray-200);
+      padding: 16px 24px;
+      flex-shrink: 0;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .header-title h1 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      background: linear-gradient(90deg, 
+        var(--google-blue) 0%, 
+        var(--google-red) 33%, 
+        var(--google-yellow) 66%, 
+        var(--google-green) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .status-section {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: white;
+      border: 1px solid var(--gray-300);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--gray-500);
+      transition: all 0.2s ease;
+    }
+
+    .status-item:hover {
+      border-color: var(--google-blue);
+    }
+
+    .status-badge {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--google-red);
+      transition: all 0.3s ease;
+    }
+
+    .status-badge.status-available {
+      background: var(--google-green);
+      box-shadow: 0 0 8px rgba(52, 168, 83, 0.4);
+    }
+
+    .status-item.active {
+      background: rgba(52, 168, 83, 0.08);
+      border-color: var(--google-green);
+      color: var(--google-green);
+    }
+
+    /* Container */
+    .container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 20px;
+    }
+
+    .container::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .container::-webkit-scrollbar-thumb {
+      background: var(--gray-300);
+      border-radius: 4px;
+    }
+
+    .container::-webkit-scrollbar-thumb:hover {
+      background: var(--gray-400);
+    }
+
+    /* Input Section with Google Style */
+    .input-section {
+      background: white;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 20px;
+      transition: all 0.2s ease;
+    }
+
+    .input-section:hover {
+      border-color: var(--gray-300);
+      box-shadow: var(--shadow-md);
+    }
+
+    .input-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
 
-    .code-input-header h3 {
-      font-size: 14px;
-      color: #333;
+    .input-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gray-900);
     }
 
     .char-count {
-      font-size: 12px;
-      color: #666;
+      font-size: 13px;
+      color: var(--gray-500);
+      font-weight: 500;
     }
 
     #codeInput {
       width: 100%;
-      height: 180px;
-      padding: 12px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
+      min-height: 200px;
+      padding: 14px;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius-sm);
+      font-family: 'Roboto Mono', 'SF Mono', Monaco, monospace;
+      font-size: 13px;
+      line-height: 1.6;
       resize: vertical;
-      background: #fafafa;
+      background: var(--gray-50);
+      color: var(--gray-900);
+      transition: all 0.2s ease;
+    }
+
+    #codeInput:hover {
+      border-color: var(--gray-400);
     }
 
     #codeInput:focus {
       outline: none;
-      border-color: #667eea;
+      border-color: var(--google-blue);
       background: white;
+      box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
     }
 
-    /* Action Buttons */
+    #codeInput::placeholder {
+      color: var(--gray-400);
+    }
+
+    /* Google-Style Action Buttons */
     .action-buttons {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      padding: 15px 20px;
-      background: white;
-      border-bottom: 2px solid #e0e0e0;
+      gap: 12px;
+      margin-top: 16px;
     }
 
     .action-btn {
-      padding: 10px 15px;
-      border: none;
-      border-radius: 6px;
-      font-size: 13px;
+      padding: 12px 20px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.3s;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #reviewBtn {
+      background: var(--google-blue);
       color: white;
+      border-color: var(--google-blue);
+    }
+
+    #reviewBtn:hover:not(:disabled) {
+      background: var(--google-blue-hover);
+      box-shadow: 0 1px 3px rgba(66, 133, 244, 0.4);
+    }
+
+    #docBtn {
+      background: white;
+      color: var(--google-green);
+      border: 1px solid var(--gray-300);
+    }
+
+    #docBtn:hover:not(:disabled) {
+      background: rgba(52, 168, 83, 0.08);
+      border-color: var(--google-green);
+    }
+
+    #refactorBtn {
+      background: white;
+      color: var(--google-yellow-hover);
+      border: 1px solid var(--gray-300);
+    }
+
+    #refactorBtn:hover:not(:disabled) {
+      background: rgba(249, 171, 0, 0.08);
+      border-color: var(--google-yellow);
+    }
+
+    .action-btn:active:not(:disabled) {
+      transform: scale(0.98);
     }
 
     .action-btn:disabled {
@@ -138,57 +284,112 @@
       cursor: not-allowed;
     }
 
-    #reviewBtn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* Results Section */
+    #resultsContainer {
+      display: none;
     }
 
-    #docBtn {
-      background: #2196f3;
+    #resultsContainer.show {
+      display: block;
+      animation: slideUp 0.3s ease;
     }
 
-    #refactorBtn {
-      background: #4caf50;
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
-    .action-btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-
-    /* Tabs */
+    /* Google Material Tabs */
     .tabs {
       display: flex;
+      gap: 0;
+      margin-bottom: 16px;
       background: white;
-      border-bottom: 2px solid #e0e0e0;
-      padding: 0 20px;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      overflow: hidden;
     }
 
     .tab-btn {
-      padding: 12px 20px;
+      flex: 1;
+      padding: 10px 16px;
       border: none;
       background: transparent;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-500);
       cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      color: #666;
-      border-bottom: 3px solid transparent;
-      transition: all 0.3s;
+      transition: all 0.2s ease;
+      position: relative;
     }
 
     .tab-btn.active {
-      color: #667eea;
-      border-bottom-color: #667eea;
+      background: var(--google-blue);
+      color: white;
     }
 
-    .tab-btn:hover {
-      color: #667eea;
+    .tab-btn:not(.active):hover {
+      background: var(--gray-100);
+      color: var(--gray-900);
     }
 
-    /* Content Area */
-    .content {
-      flex: 1;
-      overflow-y: auto;
+    /* Results Card with Thin Border */
+    .results-card {
+      background: white;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
       padding: 20px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+    }
+
+    .results-card:hover {
+      border-color: var(--gray-300);
+      box-shadow: var(--shadow-md);
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .results-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gray-900);
+    }
+
+    .copy-btn {
+      padding: 6px 16px;
+      border: 1px solid var(--gray-300);
+      background: white;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--google-blue);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .copy-btn:hover {
+      background: rgba(66, 133, 244, 0.08);
+      border-color: var(--google-blue);
+    }
+
+    .copy-btn:active {
+      transform: scale(0.95);
     }
 
     .tab-content {
@@ -197,161 +398,239 @@
 
     .tab-content.active {
       display: block;
+      animation: fadeIn 0.3s ease;
     }
 
-    .result-box {
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      white-space: pre-wrap;
-      word-wrap: break-word;
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* Result Textarea with Google Style */
+    .result-textarea {
+      width: 100%;
+      min-height: 300px;
+      max-height: 500px;
+      padding: 14px;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius-sm);
+      font-family: 'Roboto Mono', 'SF Mono', Monaco, monospace;
       font-size: 13px;
       line-height: 1.6;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      resize: vertical;
+      background: var(--gray-50);
+      color: var(--gray-900);
+      transition: all 0.2s ease;
+      white-space: pre-wrap;
+      word-wrap: break-word;
     }
 
-    .result-box code {
-      background: #f5f5f5;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-family: 'Courier New', monospace;
+    .result-textarea:hover {
+      border-color: var(--gray-400);
     }
 
-    .placeholder {
-      text-align: center;
-      padding: 60px 20px;
-      color: #999;
+    .result-textarea:focus {
+      outline: none;
+      border-color: var(--google-blue);
+      background: white;
+      box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
     }
 
-    .placeholder-icon {
-      font-size: 48px;
-      margin-bottom: 15px;
-    }
-
-    /* Copy Button */
-    .copy-btn {
-      float: right;
-      padding: 6px 12px;
-      background: #667eea;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-      margin-bottom: 10px;
-    }
-
-    .copy-btn:hover {
-      background: #5568d3;
-    }
-
-    /* Loading */
+    /* Loading with Google Colors */
     #loadingIndicator {
       display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 32px 48px;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
       text-align: center;
-      padding: 20px;
-      color: #667eea;
-      font-weight: 500;
+      z-index: 1000;
     }
 
     .spinner {
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #667eea;
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--gray-200);
+      border-top-color: var(--google-blue);
+      border-right-color: var(--google-red);
+      border-bottom-color: var(--google-yellow);
+      border-left-color: var(--google-green);
       border-radius: 50%;
-      width: 30px;
-      height: 30px;
       animation: spin 1s linear infinite;
-      margin: 0 auto 10px;
+      margin: 0 auto 16px;
     }
 
     @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 8px;
+    }
+
+    .loading-subtext {
+      font-size: 13px;
+      color: var(--gray-500);
+      max-width: 280px;
+    }
+
+    /* Placeholder */
+    #placeholder {
+      text-align: center;
+      padding: 60px 24px;
+      color: var(--gray-400);
+    }
+
+    .placeholder-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .placeholder-text {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 8px;
+    }
+
+    .placeholder-subtext {
+      font-size: 14px;
+      color: var(--gray-500);
+    }
+
+    /* Google-style notification */
+    .notification {
+      border: 1px solid rgba(0,0,0,0.1) !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
     }
   </style>
 </head>
 <body>
   <!-- Header -->
   <div class="header">
-  <h1>🤖 AI Code Review Panel</h1>
-  <div class="status-section">
-    <div class="status-item">
-      <span class="status-badge" id="promptStatus"></span>
-      <span class="status-text">Prompt API</span>
+    <div class="header-title">
+      <h1>🤖 AI Code Reviewer</h1>
     </div>
-    <div class="status-item">
-      <span class="status-badge" id="writerStatus"></span>
-      <span class="status-text">Writer API</span>
-    </div>
-    <div class="status-item">
-      <span class="status-badge" id="rewriterStatus"></span>
-      <span class="status-text">Rewriter API</span>
+    <div class="status-section">
+      <div class="status-item" id="promptStatusItem">
+        <span class="status-badge" id="promptStatus"></span>
+        <span>Prompt API</span>
+      </div>
+      <div class="status-item" id="writerStatusItem">
+        <span class="status-badge" id="writerStatus"></span>
+        <span>Writer API</span>
+      </div>
+      <div class="status-item" id="rewriterStatusItem">
+        <span class="status-badge" id="rewriterStatus"></span>
+        <span>Rewriter API</span>
+      </div>
     </div>
   </div>
-</div>
 
-  <!-- Code Input Section -->
-  <div class="code-input-section">
-    <div class="code-input-header">
-      <h3>📝 Code Input</h3>
-      <span class="char-count" id="charCount">0 characters</span>
+  <!-- Main Container -->
+  <div class="container">
+    <!-- Input Section -->
+    <div class="input-section">
+      <div class="input-header">
+        <h2>Code Input</h2>
+        <span class="char-count" id="charCount">0 characters</span>
+      </div>
+      <textarea 
+        id="codeInput" 
+        placeholder="Paste your code here or select code on GitHub..."
+      ></textarea>
+      <div class="action-buttons">
+        <button class="action-btn" id="reviewBtn">
+          🔍 Review Code
+        </button>
+        <button class="action-btn" id="docBtn">
+          📝 Generate Docs
+        </button>
+        <button class="action-btn" id="refactorBtn">
+          🔧 Refactor
+        </button>
+      </div>
     </div>
-    <textarea 
-      id="codeInput" 
-      placeholder="Select code on GitHub or paste code here..."
-    ></textarea>
-  </div>
 
-  <!-- Action Buttons -->
-  <div class="action-buttons">
-    <button id="reviewBtn" class="action-btn">🔍 Review Code</button>
-    <button id="docBtn" class="action-btn">📝 Generate Docs</button>
-    <button id="refactorBtn" class="action-btn">🔧 Refactor Code</button>
+    <!-- Results Container -->
+    <div id="resultsContainer">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="review">Review</button>
+        <button class="tab-btn" data-tab="docs">Documentation</button>
+        <button class="tab-btn" data-tab="refactor">Refactoring</button>
+      </div>
+
+      <div class="results-card">
+        <!-- Review Tab -->
+        <div class="tab-content active" id="reviewTab">
+          <div class="results-header">
+            <h3>Code Review</h3>
+            <button class="copy-btn" id="copyReviewBtn">Copy</button>
+          </div>
+          <textarea 
+            class="result-textarea" 
+            id="reviewContent" 
+            readonly
+            placeholder="Review results will appear here..."
+          ></textarea>
+        </div>
+
+        <!-- Documentation Tab -->
+        <div class="tab-content" id="docsTab">
+          <div class="results-header">
+            <h3>Documentation</h3>
+            <button class="copy-btn" id="copyDocsBtn">Copy</button>
+          </div>
+          <textarea 
+            class="result-textarea" 
+            id="docsContent" 
+            readonly
+            placeholder="Documentation will appear here..."
+          ></textarea>
+        </div>
+
+        <!-- Refactor Tab -->
+        <div class="tab-content" id="refactorTab">
+          <div class="results-header">
+            <h3>Refactoring Suggestions</h3>
+            <button class="copy-btn" id="copyRefactorBtn">Copy</button>
+          </div>
+          <textarea 
+            class="result-textarea" 
+            id="refactorContent" 
+            readonly
+            placeholder="Refactoring suggestions will appear here..."
+          ></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Placeholder -->
+    <div id="placeholder">
+      <div class="placeholder-icon">💻</div>
+      <div class="placeholder-text">Ready to Review</div>
+      <div class="placeholder-subtext">
+        Select code on GitHub or paste it above to get started
+      </div>
+    </div>
   </div>
 
   <!-- Loading Indicator -->
   <div id="loadingIndicator">
     <div class="spinner"></div>
-    <div>Processing...</div>
+    <div class="loading-text">Analyzing Code...</div>
+    <div class="loading-subtext">This may take 1-2 minutes on first run</div>
   </div>
 
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="review">Review</button>
-    <button class="tab-btn" data-tab="docs">Documentation</button>
-    <button class="tab-btn" data-tab="refactor">Refactored</button>
-  </div>
-
-  <!-- Content Area -->
-  <div class="content">
-    <div id="placeholder" class="placeholder">
-      <div class="placeholder-icon">🚀</div>
-      <h3>Ready to Review Code</h3>
-      <p>Select code on GitHub or paste code above and click an action button.</p>
-    </div>
-
-    <div id="resultsContainer" style="display: none;">
-      <!-- Review Tab -->
-      <div id="reviewTab" class="tab-content active">
-        <button class="copy-btn" id="copyReviewBtn">📋 Copy</button>
-        <div class="result-box" id="reviewContent"></div>
-      </div>
-
-      <!-- Documentation Tab -->
-      <div id="docsTab" class="tab-content">
-        <button class="copy-btn" id="copyDocsBtn">📋 Copy</button>
-        <div class="result-box" id="docsContent"></div>
-      </div>
-
-      <!-- Refactor Tab -->
-      <div id="refactorTab" class="tab-content">
-        <button class="copy-btn" id="copyRefactorBtn">📋 Copy</button>
-        <div class="result-box" id="refactorContent"></div>
-      </div>
-    </div>
-  </div>
-
-  <script src="sidepanel.js" type="module"></script>
+  <script type="module" src="sidepanel.js"></script>
 </body>
 </html>
